@@ -1,0 +1,7 @@
+streamlit>=1.38,<2
+pandas>=2.2,<4
+langgraph>=0.2,<2
+langchain-core>=0.3,<2
+langchain-openai>=0.2,<2
+langchain-ollama>=0.2,<2
+python-dotenv>=1,<2

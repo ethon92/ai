@@ -23,15 +23,30 @@ try {
   const sleeping = await wakeButton.waitFor({ state: "visible", timeout: 12_000 })
     .then(() => true)
     .catch(() => false);
+  const appRoot = page.locator('[data-testid="stAppViewContainer"], section[data-testid="stMain"]');
 
   if (sleeping) {
     console.log("App is sleeping; clicking its wake button.");
     await wakeButton.click();
     await wakeButton.waitFor({ state: "hidden", timeout: 240_000 });
-    await page.locator('[data-testid="stApp"]').waitFor({ state: "visible", timeout: 240_000 });
+    await appRoot.first().waitFor({ state: "visible", timeout: 240_000 });
     console.log("App woke and rendered the Streamlit interface.");
   } else {
-    await page.locator('[data-testid="stApp"]').waitFor({ state: "visible", timeout: 60_000 });
+    try {
+      await appRoot.first().waitFor({ state: "visible", timeout: 60_000 });
+    } catch (error) {
+      const diagnostic = {
+        title: await page.title().catch(() => "<unavailable>"),
+        finalUrl: page.url(),
+        httpStatus: response?.status() ?? "<no response>",
+        wakeButtonVisible: await wakeButton.isVisible().catch(() => false),
+        appViewContainerCount: await page.locator('[data-testid="stAppViewContainer"]').count(),
+        stMainCount: await page.locator('section[data-testid="stMain"]').count(),
+        mainCount: await page.locator("main").count(),
+      };
+      console.error("Page did not show a Streamlit app container:", JSON.stringify(diagnostic));
+      throw error;
+    }
     console.log("App is already awake; visited it successfully.");
   }
 } finally {

@@ -14,7 +14,7 @@ import db
 from config import get_setting
 
 SYSTEM = """你是教育機構的分校資料助理，使用繁體中文與使用者自然對談。
-依照使用者問題，呼叫下列唯讀資料工具取得 SQLite 中的分校資料，再清楚回答。可處理分校基本資料、學生名冊、報名明細、課程、月度招生與營收，以及跨分校招生比較。
+依照使用者問題，呼叫下列唯讀資料工具取得 SQLite 中的分校資料，再清楚回答。可處理分校基本資料、學生名冊、報名明細、課程、月度招生統計，以及跨分校招生比較。
 若分校名稱不明確，先用 search_branches 搜尋並詢問使用者選擇；不可猜測分校。可利用對話歷史解析「那間分校」「上個月」等追問。
 日期請使用 YYYY-MM-DD。報名明細依要求使用日期及課程篩選，並簡潔說明資料筆數與限制。
 不得執行 SQL、建立/修改/刪除資料、建立任務或核准流程。名冊工具不回傳電話，不要索取或推測個人聯絡資訊。
@@ -51,19 +51,19 @@ def get_branch_enrollments(branch_id: int, start_date: str = "", end_date: str =
     rows = db.branch_enrollments(branch_id, start_date or None, end_date or None,
                                  course_name, max(1, min(limit, 100)))
     # Do not send student names to the model; enrollment facts are sufficient for analysis.
-    public_rows = [{k: row[k] for k in ("enrollment_id", "enrollment_date", "course_name", "amount", "branch_name")} for row in rows]
+    public_rows = [{k: row[k] for k in ("enrollment_id", "enrollment_date", "course_name", "branch_name")} for row in rows]
     return _json({"count_returned": len(public_rows), "limit": max(1, min(limit, 100)), "enrollments": public_rows})
 
 
 @tool
 def get_branch_monthly_summary(branch_id: int, months: int = 6) -> str:
-    """查詢分校最近數月的報名筆數、學生數與報名金額合計。"""
+    """查詢分校最近數月的報名筆數與學生數。"""
     return _json(db.branch_monthly_summary(branch_id, max(1, min(months, 12))))
 
 
 @tool
 def compare_branch_enrollment() -> str:
-    """比較所有分校最新資料月份與前一月份的招生人數、營收及變化率。"""
+    """比較所有分校最新資料月份與前一月份的招生人數及變化率。"""
     return _json(db.enrollment_comparison())
 
 

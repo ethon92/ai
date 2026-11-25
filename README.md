@@ -1,13 +1,15 @@
-# 知行｜Education AI Operations Agent
+# AI 營運中心｜Education Operations Agent
 
 以教育機構分校招生為情境的 Mini ERP + 對話式 AI Agent MVP。使用者可自然語言多輪對談，查詢各分校的 SQLite 資料。
 
 ## 功能
 
-- SQLite Mini ERP：`branches`、`students`、`enrollments` 三張關聯資料表。
-- 營運總覽：招生月增減、招生預警與營收摘要。
+- SQLite Mini ERP：`branches`、`students`、`courses`、`enrollments` 四張關聯資料表。
+- 25 間示範分校各有唯一名稱；`branches.branch_name` 有唯一索引。
+- `enrollments` 使用 `course_id` 外鍵；同一學生在同一分校同一課程僅能註冊一次。
+- 營運總覽：月度招生人數比較與招生預警。
 - 分校資料助理：以自然語言多輪查詢分校資料，對話歷史會提供給 Agent 作為上下文。
-- 分校查詢：分校基本資料、學生名冊、報名明細、月度招生與營收。
+- 分校查詢：分校基本資料、學生名冊、報名明細、月度招生統計。
 - LangGraph Agent 提供分校搜尋、基本資料、名冊、報名明細、月度摘要及跨分校比較工具；可用 Ollama 或 OpenRouter 免費模型路由。Agent 僅讀取資料，不建立或修改資料。
 - CSV 匯出；介面名冊不顯示學生電話等聯絡資訊。
 
@@ -53,4 +55,4 @@ requirements.txt Python 套件
 
 ## MVP 邊界
 
-目前日期相關模擬資料會在啟動時建立，營收以報名金額加總作為示範指標。月份比較使用最新資料月份與前一月份。此專案不代表任何真實機構資料或正式 ERP。
+目前日期相關模擬資料會在啟動時建立。舊版 SQLite 會自動移轉至新 schema：課程名稱正規化成 `courses` 外鍵，同一學生／課程／分校的重複報名保留最早一筆，並移除電話、金額及 `tasks` 表。月份比較使用最新資料月份與前一月份。此專案不代表任何真實機構資料或正式 ERP。

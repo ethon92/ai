@@ -19,33 +19,61 @@ try {
     throw new Error(`Streamlit returned HTTP ${response.status()}.`);
   }
 
-  const wakeButton = page.getByRole("button", { name: /yes,\s*get this app back up!?/i });
-  const sleeping = await wakeButton.waitFor({ state: "visible", timeout: 12_000 })
-    .then(() => true)
-    .catch(() => false);
-  const appRoot = page.locator('[data-testid="stAppViewContainer"], section[data-testid="stMain"]');
+  // Streamlit Community Cloud serves the app inside an iframe. Playwright
+  // does not search iframe contents when a locator is created from `page`.
+  // Rebuild the candidates each time because the iframe can be replaced while
+  // the app wakes up.
+  const candidates = () => page.frames().flatMap((frame) => [
+    {
+      frame,
+      wakeButton: frame.getByRole("button", { name: /yes,\s*get this app back up!?/i }),
+      appRoot: frame.locator('[data-testid="stAppViewContainer"], section[data-testid="stMain"]'),
+    },
+  ]);
+
+  const waitForVisible = async (key, timeoutMs) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      for (const candidate of candidates()) {
+        const locator = candidate[key];
+        if (await locator.count() && await locator.first().isVisible().catch(() => false)) {
+          return { ...candidate, locator: locator.first() };
+        }
+      }
+      await page.waitForTimeout(1_000);
+    }
+    return null;
+  };
+
+  const sleeping = await waitForVisible("wakeButton", 12_000);
 
   if (sleeping) {
     console.log("App is sleeping; clicking its wake button.");
-    await wakeButton.click();
-    await wakeButton.waitFor({ state: "hidden", timeout: 240_000 });
-    await appRoot.first().waitFor({ state: "visible", timeout: 240_000 });
+    await sleeping.locator.click();
+    const app = await waitForVisible("appRoot", 240_000);
+    if (!app) {
+      throw new Error("The wake button was clicked, but the Streamlit app did not render within 240 seconds.");
+    }
     console.log("App woke and rendered the Streamlit interface.");
   } else {
-    try {
-      await appRoot.first().waitFor({ state: "visible", timeout: 60_000 });
-    } catch (error) {
+    const app = await waitForVisible("appRoot", 60_000);
+    if (!app) {
+      const frames = await Promise.all(page.frames().map(async (frame) => ({
+        url: frame.url(),
+        title: frame.name(),
+        wakeButtonCount: await frame.getByRole("button", { name: /yes,\s*get this app back up!?/i }).count(),
+        appViewContainerCount: await frame.locator('[data-testid="stAppViewContainer"]').count(),
+        stMainCount: await frame.locator('section[data-testid="stMain"]').count(),
+        mainCount: await frame.locator("main").count(),
+      })));
       const diagnostic = {
         title: await page.title().catch(() => "<unavailable>"),
         finalUrl: page.url(),
         httpStatus: response?.status() ?? "<no response>",
-        wakeButtonVisible: await wakeButton.isVisible().catch(() => false),
-        appViewContainerCount: await page.locator('[data-testid="stAppViewContainer"]').count(),
-        stMainCount: await page.locator('section[data-testid="stMain"]').count(),
-        mainCount: await page.locator("main").count(),
+        frames,
       };
       console.error("Page did not show a Streamlit app container:", JSON.stringify(diagnostic));
-      throw error;
+      throw new Error("Timed out waiting for the Streamlit app container in the page or its frames.");
     }
     console.log("App is already awake; visited it successfully.");
   }

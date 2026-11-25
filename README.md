@@ -42,6 +42,18 @@ OPENROUTER_MODEL = "openrouter/free"
 
 Community Cloud 無法直接連到你電腦上的 `localhost` Ollama，因此部署時使用 OpenRouter API。`openrouter/free` 會路由到當下可用且支援所需能力的免費模型；免費模型有使用量限制且實際模型可能變動。更多資訊見 [OpenRouter 免費模型路由](https://openrouter.ai/openrouter/free)。
 
+## GitHub Actions 定時喚醒 Community Cloud App
+
+`.github/workflows/wake-streamlit.yml` 會每 8 小時以 Chromium 開啟公開 App；若偵測到休眠頁，便點擊「Yes, get this app back up!」，並等待 Streamlit 介面載入。也可在 GitHub 的 **Actions** 頁面手動執行 `Wake Streamlit app`。
+
+部署 workflow 前，請在 GitHub Repository 前往 **Settings → Secrets and variables → Actions → Variables**，新增 Repository variable：
+
+| 名稱 | 值 |
+|---|---|
+| `STREAMLIT_APP_URL` | 公開 Streamlit App 的完整 HTTPS 網址 |
+
+排程為 UTC 00:17、08:17、16:17（台灣時間 08:17、16:17、隔日 00:17）。GitHub Actions 排程可能延遲或漏執行，故此流程不能保證 App 永不休眠；休眠時需公開瀏覽權限，私人 App 需要登入的情況不在此腳本支援範圍。
+
 ## 專案結構
 
 ```text

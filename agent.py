@@ -22,6 +22,7 @@ SYSTEM = """你是教育機構的分校資料助理，使用繁體中文與使�
 
 
 def _json(value) -> str:
+    """將工具查詢結果轉成保留繁體中文的 JSON 字串。"""
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
@@ -72,10 +73,12 @@ TOOLS = [search_branches, get_branch_profile, get_branch_students,
 
 
 class State(TypedDict):
+    """定義 LangGraph 對話狀態，並以 add_messages 合併訊息歷史。"""
     messages: Annotated[list, add_messages]
 
 
 def _make_model():
+    """依設定建立指定的 LLM，並綁定唯讀分校查詢工具。"""
     provider = get_setting("AI_PROVIDER", "ollama").lower()
     if provider == "openrouter":
         from langchain_openai import ChatOpenAI
@@ -97,14 +100,17 @@ def _make_model():
 
 
 def run_agent(question: str, history: list[dict] | None = None) -> dict:
+    """執行自然語言查詢流程，回傳回答、已呼叫工具及使用模式。"""
     model = _make_model()
     if model is None:
         return _run_demo(question)
 
     def assistant(state: State):
+        """呼叫模型，根據目前對話產生回答或工具呼叫。"""
         return {"messages": [model.invoke([SystemMessage(content=SYSTEM), *state["messages"]])]}
 
     def route(state: State):
+        """判斷模型是否要求執行工具，否則結束對話流程。"""
         return "tools" if getattr(state["messages"][-1], "tool_calls", None) else END
 
     from langgraph.prebuilt import ToolNode
@@ -132,7 +138,7 @@ def run_agent(question: str, history: list[dict] | None = None) -> dict:
 
 
 def _run_demo(question: str) -> dict:
-    """Offline fallback. Full natural-language interpretation requires an LLM provider."""
+    """在離線示範模式下回覆簡單查詢；完整自然語言理解需設定 LLM。"""
     rows = db.enrollment_comparison()
     falling = [r for r in rows if r["previous_students"] and r["change_pct"] <= -20]
     if any(word in question for word in ("比較", "全部", "所有", "下降", "招生")):

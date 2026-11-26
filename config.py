@@ -5,6 +5,7 @@ import os
 
 
 def get_setting(name: str, default: str = "") -> str:
+    """依序從環境變數、Streamlit Secrets 讀取設定，找不到時回傳預設值。"""
     value = os.getenv(name)
     if value:
         return value

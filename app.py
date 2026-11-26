@@ -12,7 +12,7 @@ st.set_page_config(page_title="AI 營運中心", page_icon="🤖", layout="wide"
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap');
 html,body,[class*="css"] {font-family:'DM Sans','Noto Sans TC',sans-serif}
-.stApp{background:#f5f7fb}.block-container{padding-top:2rem;max-width:1440px}
+.stApp{background:#f5f7fb}.block-container{padding-top:4rem;max-width:1440px}
 [data-testid="stSidebar"]{background:#111b2e}.sidebar-title{font-size:20px;font-weight:800;color:#fff;padding:4px 8px 28px}
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{color:#c2cad8}
 .eyebrow{color:#707e93;font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
@@ -38,6 +38,7 @@ comparison = db.enrollment_comparison()
 today = date.today()
 
 def header(title, subtitle):
+    """在頁面上顯示統一格式的標題、副標題與營運標籤。"""
     st.markdown(f'<div class="eyebrow">EDUCATION OPERATIONS</div><div class="page-title">{title}</div><div class="subtle">{subtitle}</div>', unsafe_allow_html=True)
 
 if page == "營運總覽":

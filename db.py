@@ -24,6 +24,7 @@ LEGACY_BRANCH_SUFFIXES = ["中正", "板橋", "桃園", "光復", "西屯", "員
 
 
 def connect() -> sqlite3.Connection:
+    """建立 SQLite 連線、設定列資料格式並啟用外來鍵檢查。"""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -32,14 +33,17 @@ def connect() -> sqlite3.Connection:
 
 
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    """檢查指定資料表是否存在於目前 SQLite 資料庫。"""
     return conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone() is not None
 
 
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    """取得指定資料表的欄位名稱集合。"""
     return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
 
 
 def _create_students(conn: sqlite3.Connection, name: str = "students", ref: str = "branches") -> None:
+    """建立學生資料表，並以 branch_id 關聯分校資料表。"""
     conn.execute(f"""CREATE TABLE {name} (
       student_id INTEGER PRIMARY KEY,
       student_name TEXT NOT NULL,
@@ -49,6 +53,7 @@ def _create_students(conn: sqlite3.Connection, name: str = "students", ref: str 
 
 def _create_enrollments(conn: sqlite3.Connection, name: str = "enrollments",
                         students_table: str = "students") -> None:
+    """建立報名資料表、外來鍵及學生課程分校組合的唯一限制。"""
     conn.execute(f"""CREATE TABLE {name} (
       enrollment_id INTEGER PRIMARY KEY,
       student_id INTEGER NOT NULL REFERENCES {students_table}(student_id),
@@ -60,7 +65,7 @@ def _create_enrollments(conn: sqlite3.Connection, name: str = "enrollments",
 
 
 def _migrate_legacy_tables(conn: sqlite3.Connection) -> None:
-    """Normalize legacy course_name rows and remove old phone/amount/task fields."""
+    """遷移舊版資料表結構，正規化課程關聯並移除電話、金額及任務欄位。"""
     has_students = _table_exists(conn, "students")
     has_enrollments = _table_exists(conn, "enrollments")
     student_cols = _columns(conn, "students") if has_students else set()
@@ -110,7 +115,7 @@ def _migrate_legacy_tables(conn: sqlite3.Connection) -> None:
 
 
 def _repair_duplicate_demo_branches(conn: sqlite3.Connection) -> None:
-    """Give the original 25-row demo dataset unique branch names without changing IDs."""
+    """修正舊版 25 筆示範分校名稱重複問題，同時保留原分校編號。"""
     rows = conn.execute("SELECT branch_id,branch_name,location FROM branches ORDER BY branch_id").fetchall()
     if len(rows) != len(BRANCH_SEEDS):
         return
@@ -127,6 +132,7 @@ def _repair_duplicate_demo_branches(conn: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
+    """建立或遷移資料表、修正示範分校並在必要時初始化示範資料。"""
     with connect() as conn:
         # Table rebuilds require FK checks to be deferred until after migration.
         conn.execute("PRAGMA foreign_keys = OFF")
@@ -156,6 +162,7 @@ def init_db() -> None:
 
 
 def _seed_demo_data(conn: sqlite3.Connection) -> None:
+    """依分校、月份與課程產生六個月的模擬學生及報名資料。"""
     branches = [r["branch_id"] for r in conn.execute("SELECT branch_id FROM branches ORDER BY branch_id")]
     course_ids = {r["course_name"]: r["course_id"] for r in conn.execute("SELECT course_id,course_name FROM courses")}
     today = date.today()
@@ -185,11 +192,13 @@ def _seed_demo_data(conn: sqlite3.Connection) -> None:
 
 
 def branch_rows() -> list[dict]:
+    """依分校編號排序，回傳所有分校資料。"""
     with connect() as conn:
         return [dict(r) for r in conn.execute("SELECT * FROM branches ORDER BY branch_id")]
 
 
 def search_branches(keyword: str = "", location: str = "") -> list[dict]:
+    """依名稱、主管或地區關鍵字篩選分校並回傳結果。"""
     sql = "SELECT branch_id, branch_name, location, manager, status FROM branches WHERE 1=1"
     args: list = []
     if keyword.strip():
@@ -204,6 +213,7 @@ def search_branches(keyword: str = "", location: str = "") -> list[dict]:
 
 
 def branch_detail(branch_id: int) -> dict | None:
+    """查詢單一分校資料，並計算該分校的學生數與報名筆數。"""
     with connect() as conn:
         row = conn.execute("""
           SELECT b.*, COUNT(DISTINCT s.student_id) AS student_count,
@@ -216,7 +226,7 @@ def branch_detail(branch_id: int) -> dict | None:
 
 
 def branch_students(branch_id: int) -> list[dict]:
-    """Return the students table columns for one branch, without dropped phone data."""
+    """回傳指定分校的學生資料表欄位，不包含已移除的電話資料。"""
     with connect() as conn:
         return [dict(r) for r in conn.execute("""
           SELECT student_id, student_name, branch_id
@@ -226,6 +236,7 @@ def branch_students(branch_id: int) -> list[dict]:
 
 def branch_enrollments(branch_id: int, start_date: str | None = None, end_date: str | None = None,
                        course_name: str = "", limit: int = 100) -> list[dict]:
+    """依分校查詢報名明細，可選擇日期區間、課程關鍵字及筆數上限。"""
     sql = """SELECT e.enrollment_id, e.student_id, e.course_id, e.branch_id,
                     e.enrollment_date, c.course_name, s.student_name, b.branch_name
              FROM enrollments e JOIN students s USING(student_id)
@@ -244,6 +255,7 @@ def branch_enrollments(branch_id: int, start_date: str | None = None, end_date: 
 
 
 def branch_monthly_summary(branch_id: int, months: int = 6) -> list[dict]:
+    """依報名日期彙總指定分校最近數月的報名筆數及不重複學生數。"""
     with connect() as conn:
         return [dict(r) for r in conn.execute("""
           SELECT strftime('%Y-%m', enrollment_date) AS month,
@@ -254,7 +266,7 @@ def branch_monthly_summary(branch_id: int, months: int = 6) -> list[dict]:
 
 
 def enrollment_comparison(months: int = 2) -> list[dict]:
-    """Compare the latest calendar month with the previous calendar month."""
+    """比較各分校最近有報名資料月份與前一月份的招生人數及變化率。"""
     with connect() as conn:
         rows = conn.execute("""
           WITH monthly AS (

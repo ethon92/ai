@@ -23,6 +23,7 @@ try {
   // does not search iframe contents when a locator is created from `page`.
   // Rebuild the candidates each time because the iframe can be replaced while
   // the app wakes up.
+  // Build locators for the page and every current frame, including Streamlit's app iframe.
   const candidates = () => page.frames().flatMap((frame) => [
     {
       frame,
@@ -31,6 +32,7 @@ try {
     },
   ]);
 
+  // Poll current frames until the requested locator becomes visible or the timeout expires.
   const waitForVisible = async (key, timeoutMs) => {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
